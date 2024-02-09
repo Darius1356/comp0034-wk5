@@ -1,7 +1,9 @@
-# The custom decorator code will go in here
-import jwt
+from functools import wraps
 from datetime import datetime, timedelta
-from flask import make_response, current_app as app
+import jwt
+from flask import request, make_response, current_app as app
+from paralympics import db
+from paralympics.models import User
 
 
 def encode_auth_token(user_id):
@@ -46,13 +48,6 @@ def decode_auth_token(auth_token):
         return make_response({'message': "Token expired. Please log in again."}, 401)
     except jwt.InvalidTokenError:
         return make_response({'message': "Invalid token. Please log in again."}, 401)
-    
-
-from functools import wraps
-from flask import request, make_response
-from paralympics import db
-from paralympics.models import User
-from paralympics.helpers import decode_auth_token
 
 
 def token_required(f):
@@ -81,5 +76,5 @@ def token_required(f):
             response = {"message": "Invalid or missing token."}
             return make_response(response, 401)
         return f(*args, **kwargs)
-
+    
     return decorator

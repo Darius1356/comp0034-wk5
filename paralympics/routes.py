@@ -1,47 +1,16 @@
 from flask import json, make_response, current_app as app, request, abort, jsonify
-from marshmallow.exceptions import ValidationError
 from sqlalchemy import exc
 from paralympics import db
 from paralympics.models import Region, Event, User
 from paralympics.schemas import RegionSchema, EventSchema
 from werkzeug.exceptions import HTTPException
-from datetime import datetime, timedelta
-import jwt
-from paralympics.helpers import encode_auth_token
+from paralympics.helpers import encode_auth_token, token_required
 
 # Flask-Marshmallow Schemas
 regions_schema = RegionSchema(many=True)
 region_schema = RegionSchema()
 events_schema = EventSchema(many=True)
 event_schema = EventSchema()
-
-
-# Error handlers
-@app.errorhandler(ValidationError)
-def register_validation_error(error):
-    """ Error handler for marshmallow schema validation errors.
-
-    Args:
-        error (ValidationError): Marshmallow error.
-
-    Returns:
-        HTTP response with the validation error message and the 400 status code
-    """
-    response = error.messages
-    return response, 400
-
-
-@app.errorhandler(404)
-def resource_not_found(e):
-    """ Error handler for 404.
-
-        Args:
-            HTTP 404 error
-
-        Returns:
-            JSON response with the validation error message and the 404 status code
-        """
-    return jsonify(error=str(e)), 404
 
 
 @app.get("/regions")
@@ -109,6 +78,7 @@ def get_event(event_id):
 
 
 @app.post('/events')
+@token_required
 def add_event():
     """ Adds a new event.
 
@@ -126,6 +96,7 @@ def add_event():
 
 
 @app.post('/regions')
+@token_required
 def add_region():
     """ Adds a new region.
 
@@ -143,6 +114,7 @@ def add_region():
 
 
 @app.delete('/events/<int:event_id>')
+@token_required
 def delete_event(event_id):
     """ Deletes the event with the given id.
 
@@ -158,6 +130,7 @@ def delete_event(event_id):
 
 
 @app.delete('/regions/<noc_code>')
+@token_required
 def delete_region(noc_code):
     """ Deletes the region with the given code.
 
@@ -181,6 +154,7 @@ def delete_region(noc_code):
 
 
 @app.patch("/events/<event_id>")
+@token_required
 def event_update(event_id):
     """ Updates changed fields for the specified event.
     
@@ -204,6 +178,7 @@ def event_update(event_id):
 
 
 @app.patch("/regions/<noc_code>")
+@token_required
 def region_update(noc_code):
     """Updates changed fields for the specified region.
     
@@ -272,6 +247,7 @@ def resource_not_found(e):
 
 
 @app.post("/register")
+@token_required
 def register():
     """Register a new user for the REST API
 
@@ -312,6 +288,7 @@ def register():
 
 
 @app.post('/login')
+@token_required
 def login():
     """Logins in the User and generates a token
 

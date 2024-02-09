@@ -8,17 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from paralympics import db
 
 
-# This uses the latest syntax for SQLAlchemy, older tutorials will show different syntax
-# SQLAlchemy provide an __init__ method for each model, so you do not need to declare this in your code
 class Region(db.Model):
     __tablename__ = "region"
     NOC: Mapped[String] = mapped_column(db.Text, primary_key=True)
     region: Mapped[String] = mapped_column(db.Text, nullable=False)
     notes: Mapped[String] = mapped_column(db.Text, nullable=True)
     # one-to-many relationship with Event
-    # https://docs.sqlalchemy.org/en/20/orm/basic_relationships.html#one-to-many
     events: Mapped[List["Event"]] = relationship(back_populates="region")
-    # cascade='all, delete, delete-orphan'
 
 
 class Event(db.Model):
@@ -31,7 +27,6 @@ class Event(db.Model):
     # add ForeignKey to Region which is the parent table
     NOC: Mapped[String] = mapped_column(ForeignKey("region.NOC"))
     # add relationship to Region table, the parent
-    # https://docs.sqlalchemy.org/en/20/orm/basic_relationships.html#one-to-many
     region: Mapped["Region"] = relationship(back_populates="events")
     start: Mapped[String] = mapped_column(db.Text, nullable=True)
     end: Mapped[String] = mapped_column(db.Text, nullable=True)

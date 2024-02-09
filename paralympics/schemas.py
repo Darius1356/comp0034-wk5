@@ -1,4 +1,4 @@
-from paralympics.models import Event, Region
+from paralympics.models import Event, Region, User
 from paralympics import db, ma
 
 
@@ -18,7 +18,6 @@ class RegionSchema(ma.SQLAlchemySchema):
     notes = ma.auto_field()
 
 
-
 class EventSchema(ma.SQLAlchemyAutoSchema):
     """Marshmallow schema for the attributes of an event class. Inherits all the attributes from the Event class."""
 
@@ -28,3 +27,19 @@ class EventSchema(ma.SQLAlchemyAutoSchema):
         # load_instance = True creates an object from .load() instead of a dictionary
         load_instance = True
         sqla_session = db.session
+
+
+class UserSchema(ma.SQLAlchemySchema):
+    """Marshmallow schema defining the attributes for creating a new user.
+
+    The password_hash is set later using the
+    """
+
+    class Meta:
+        model = User
+        load_instance = True
+        sqla_session = db.session
+        include_relationships = True
+
+    email = ma.auto_field()
+    password_hash = ma.auto_field()
