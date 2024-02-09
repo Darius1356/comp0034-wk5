@@ -3,6 +3,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from sqlalchemy.orm import DeclarativeBase
+from logging.config import dictConfig
 
 
 # https://flask-sqlalchemy.palletsprojects.com/en/3.1.x/quickstart/
@@ -20,6 +21,26 @@ ma = Marshmallow()
 
 
 def create_app(test_config=None):
+    dictConfig({
+        'version': 1,
+        'formatters': {'default': {
+            'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        }},
+        'handlers':
+            {'wsgi': {
+                'class': 'logging.StreamHandler',
+                'stream': 'ext://flask.logging.wsgi_errors_stream',
+                'formatter': 'default'
+            },
+                "file": {
+                    "class": "logging.FileHandler",
+                    "filename": "paralympics_log.log",
+                    "formatter": "default",
+                },
+            },
+        "root": {"level": "DEBUG", "handlers": ["wsgi", "file"]},
+    })
+
     # create and configure the app
     app = Flask('paralympics', instance_relative_config=True)
     app.config.from_mapping(

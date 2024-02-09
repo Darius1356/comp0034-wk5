@@ -1,9 +1,13 @@
-from flask import current_app as app, request, abort, jsonify
+from flask import json, make_response, current_app as app, request, abort, jsonify
 from marshmallow.exceptions import ValidationError
 from sqlalchemy import exc
 from paralympics import db
-from paralympics.models import Region, Event
+from paralympics.models import Region, Event, User
 from paralympics.schemas import RegionSchema, EventSchema
+from werkzeug.exceptions import HTTPException
+from datetime import datetime, timedelta
+import jwt
+from paralympics.helpers import encode_auth_token
 
 # Flask-Marshmallow Schemas
 regions_schema = RegionSchema(many=True)
@@ -71,12 +75,10 @@ def get_region(code):
     # Try to find the region, if it is ot found, catch the error and return 404
     try:
         region = db.session.execute(db.select(Region).filter_by(NOC=code)).scalar_one()
-        # Dump the data using the Marshmallow region schema; '.dump()' returns JSON.
         result = region_schema.dump(region)
-        # Return the data in the HTTP response
         return result
     except exc.NoResultFound as e:
-        # See https://flask.palletsprojects.com/en/2.3.x/errorhandling/#returning-api-errors-as-json
+        app.logger.error(f'Region code {code} was not found. Error: {e}')
         abort(404, description="Region not found")
 
 
@@ -162,15 +164,20 @@ def delete_region(noc_code):
     Args:
         param code (str): The 3-character NOC code of the region to delete
     Returns:
-        JSON
+        JSON If successful, return success message, other return 404 Not Found
     """
-    region = db.session.execute(db.select(Region).filter_by(NOC=noc_code)).scalar_one()
-    if region:
+    try:
+        region = db.session.execute(db.select(Region).filter_by(NOC=noc_code)).scalar_one()
         db.session.delete(region)
         db.session.commit()
         return {"message": f"Region {noc_code} deleted."}
-    else:
-        abort(404, description="Region not found")
+    except exc.SQLAlchemyError as e:
+        # Log the exception
+        app.logger.error(f"A database error occurred: {str(e)}")
+        # Return a 404 error to the user who made the request
+        msg_content = f'Region {noc_code} not found'
+        msg = {'message': msg_content}
+        return make_response(msg, 404)
 
 
 @app.patch("/events/<event_id>")
@@ -220,3 +227,117 @@ def region_update(noc_code):
     # Return json message
     response = {"message": f"Region {noc_code} updated."}
     return response
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle non-HTTP exceptions as 500 Server error in JSON format."""
+
+    # pass through HTTP errors
+    if isinstance(e, HTTPException):
+        return e
+
+    # now you're handling non-HTTP exceptions only
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps({
+        "code": 500,
+        "name": e.name,
+        "description": e.description,
+    })
+    response.content_type = "application/json"
+    return response
+
+
+@app.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps({
+        "code": e.code,
+        "name": e.name,
+        "description": e.description,
+    })
+    response.content_type = "application/json"
+    return response
+
+
+@app.errorhandler(404)
+def resource_not_found(e):
+    """Handle a specific HTTP error (404 in this case) with custom message for the app when Flask.abort() is called.
+    """
+    return jsonify(error=str(e)), 404
+
+
+@app.post("/register")
+def register():
+    """Register a new user for the REST API
+
+    If successful, return 201 Created.
+    If email already exists, return 409 Conflict (resource already exists).
+    If any other error occurs, return 500 Server error
+    """
+    # Get the JSON data from the request
+    post_data = request.get_json()
+    # Check if user already exists, returns None if the user does not exist
+    user = db.session.execute(
+        db.select(User).filter_by(email=post_data.get("email"))
+    ).scalar_one_or_none()
+    if not user:
+        try:
+            # Create new User object
+            user = User(email=post_data.get("email"))
+            # Set the hashed password
+            user.set_password(password=post_data.get("password"))
+            # Add user to the database
+            db.session.add(user)
+            db.session.commit()
+            # Return success message
+            response = {
+                "message": "Successfully registered.",
+            }
+            return make_response(jsonify(response)), 201
+        except Exception as err:
+            response = {
+                "message": "An error occurred. Please try again.",
+            }
+            return make_response(jsonify(response)), 500
+    else:
+        response = {
+            "message": "User already exists. Please Log in.",
+        }
+        return make_response(jsonify(response)), 409
+
+
+@app.post('/login')
+def login():
+    """Logins in the User and generates a token
+
+    If the email and password are not present in the HTTP request, return 401 error
+    If the user is not found in the database, or the password is incorrect, return 401 error
+    If the user is logged in and the token is generated, return the token and 201 Success
+    """
+    auth = request.get_json()
+
+    # Check the email and password are present, if not return a 401 error
+    if not auth or not auth.get('email') or not auth.get('password'):
+        msg = {'message': 'Missing email or password'}
+        return make_response(msg, 401)
+
+    # Find the user in the database
+    user = db.session.execute(
+        db.select(User).filter_by(email=auth.get("email"))
+    ).scalar_one_or_none()
+
+    # If the user is not found, or the password is incorrect, return 401 error
+    if not user or not user.check_password(auth.get('password')):
+        msg = {'message': 'Incorrect email or password.'}
+        return make_response(msg, 401)
+
+    # If all OK then create the token
+    token = encode_auth_token(user.id)
+
+    # Return the token and the user_id of the logged in user
+    return make_response(jsonify({"user_id": user.id, "token": token}), 201)
