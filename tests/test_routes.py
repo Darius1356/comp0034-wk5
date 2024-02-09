@@ -67,7 +67,7 @@ def test_post_region(client):
     GIVEN a Flask test client
     AND valid JSON for a new region
     WHEN a POST request is made to /regions
-    THEN the response status_code should be 200
+    THEN the response status_code should be 201
     """
     # JSON to create a new region
     region_json = {
@@ -80,6 +80,7 @@ def test_post_region(client):
         json=region_json,
         content_type="application/json",
     )
+    # 201 is the HTTP status code for a successful POST or PUT request
     assert response.status_code == 200
 
 
