@@ -6,7 +6,6 @@ from sqlalchemy.orm import DeclarativeBase
 from logging.config import dictConfig
 
 
-# https://flask-sqlalchemy.palletsprojects.com/en/3.1.x/quickstart/
 class Base(DeclarativeBase):
     pass
 
@@ -16,7 +15,6 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 # Create the Marshmallow instance after SQLAlchemy
-# See https://flask-marshmallow.readthedocs.io/en/latest/#optional-flask-sqlalchemy-integration
 ma = Marshmallow()
 
 
